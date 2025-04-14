@@ -3,7 +3,8 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import CitySelector from "@/components/city-selector"
-import { Globe, MapPin, Calendar, Shield, Coffee, Users, ArrowRight } from "lucide-react"
+import { Globe, MapPin, Calendar, Shield, Coffee, Users, ArrowRight, CheckCircle, ShieldCheck, User } from "lucide-react"
+import DiditAuthButton from "@/components/didit-auth-button"
 
 export default function Home() {
   return (
@@ -13,22 +14,24 @@ export default function Home() {
         <div className="container mx-auto px-4 py-12">
           <div className="grid gap-8 items-center md:grid-cols-2">
             <div className="space-y-6">
-              <div className="inline-block rounded-lg bg-primary/10 px-3 py-1 text-sm text-primary">
-                Travel smarter, together
+              <div className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-1 text-sm text-primary">
+                <ShieldCheck className="h-4 w-4" /> Trusted Travel Community
               </div>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
                 Traveler Info Hub
               </h1>
               <p className="text-xl text-muted-foreground">
-                Discover, share, and connect with fellow travelers. 
+                Discover, share, and connect with verified travelers. 
                 Get authentic insights about cities worldwide, from local events to avoiding scams.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/auth/signup">
-                  <Button size="lg" className="gap-2">
-                    Get Started <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
+                <DiditAuthButton 
+                  authType="signup" 
+                  size="lg" 
+                  className="gap-2"
+                >
+                  Get Started <ArrowRight className="h-4 w-4" />
+                </DiditAuthButton>
                 <Link href="/forums/suggestions">
                   <Button variant="outline" size="lg">
                     Explore Destinations
@@ -62,6 +65,69 @@ export default function Home() {
         </div>
         <div className="max-w-2xl mx-auto">
           <CitySelector />
+        </div>
+      </section>
+
+      {/* Verification Feature Section */}
+      <section className="container mx-auto px-4 py-12 bg-gradient-to-b from-muted/5 to-muted/20">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 mb-4 bg-green-50 text-green-700 px-3 py-1 rounded-full">
+            <ShieldCheck className="h-4 w-4" /> Verified Community
+          </div>
+          <h2 className="text-3xl font-bold mb-2">Built on Trust & Safety</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Our platform uses advanced ID and facial verification to create a trusted community of travelers
+          </p>
+        </div>
+        
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card className="border border-muted/40 bg-background/60 backdrop-blur">
+            <CardHeader>
+              <div className="mb-4 p-3 bg-primary/10 w-fit rounded-lg">
+                <Shield className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle>ID Verification</CardTitle>
+              <CardDescription>Verify your government-issued ID</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Securely upload and verify your government-issued ID through our partnership with Didit.me. 
+                Your personal information remains private and protected.
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card className="border border-muted/40 bg-background/60 backdrop-blur">
+            <CardHeader>
+              <div className="mb-4 p-3 bg-primary/10 w-fit rounded-lg">
+                <User className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle>Facial Verification</CardTitle>
+              <CardDescription>Confirm you're a real person</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Complete a quick facial scan to verify your identity matches your ID. 
+                Our system uses advanced liveness detection technology.
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card className="border border-muted/40 bg-background/60 backdrop-blur">
+            <CardHeader>
+              <div className="mb-4 p-3 bg-primary/10 w-fit rounded-lg">
+                <CheckCircle className="h-6 w-6 text-primary" />
+              </div>
+              <CardTitle>Trusted Community</CardTitle>
+              <CardDescription>Connect with verified travelers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Verified profiles receive a trust badge, making it easy to identify trustworthy community members
+                and have more meaningful, safer interactions.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -167,13 +233,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Testimonials/How It Works */}
+      {/* How It Works */}
       <section className="bg-muted/20 py-12">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold mb-2">How It Works</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Join our community in three simple steps
+              Join our verified community in three simple steps
             </p>
           </div>
 
@@ -182,27 +248,27 @@ export default function Home() {
               <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                 <span className="text-primary font-bold text-lg">1</span>
               </div>
-              <h3 className="text-xl font-bold mb-2">Create an Account</h3>
+              <h3 className="text-xl font-bold mb-2">Create Your Account</h3>
               <p className="text-muted-foreground">
-                Sign up for free and become part of our global travel community
+                Sign up with your email using our secure passwordless system
               </p>
             </div>
             <div className="flex flex-col items-center text-center">
               <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                 <span className="text-primary font-bold text-lg">2</span>
               </div>
-              <h3 className="text-xl font-bold mb-2">Explore or Share</h3>
+              <h3 className="text-xl font-bold mb-2">Verify Your Identity</h3>
               <p className="text-muted-foreground">
-                Browse information about cities or contribute your own insights
+                Complete quick ID and facial verification to become a trusted member
               </p>
             </div>
             <div className="flex flex-col items-center text-center">
               <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                 <span className="text-primary font-bold text-lg">3</span>
               </div>
-              <h3 className="text-xl font-bold mb-2">Connect & Travel</h3>
+              <h3 className="text-xl font-bold mb-2">Connect With Confidence</h3>
               <p className="text-muted-foreground">
-                Connect with other travelers, ask questions, and travel with confidence
+                Interact with other verified travelers with peace of mind
               </p>
             </div>
           </div>
@@ -212,18 +278,24 @@ export default function Home() {
       {/* CTA Section */}
       <section className="container mx-auto px-4 py-16">
         <div className="bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl p-8 text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Explore the World?</h2>
+          <h2 className="text-3xl font-bold mb-4">Ready to Join Our Verified Community?</h2>
           <p className="text-lg text-muted-foreground mb-6 max-w-2xl mx-auto">
-            Join thousands of travelers worldwide sharing insights and making connections.
-            Create your account today and start your journey.
+            Create your secure, verified account today and connect with trusted travelers worldwide.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Link href="/auth/signup">
-              <Button size="lg">Sign Up Now</Button>
-            </Link>
-            <Link href="/auth/login">
-              <Button variant="outline" size="lg">Login</Button>
-            </Link>
+            <DiditAuthButton 
+              authType="signup" 
+              size="lg"
+            >
+              Sign Up Now
+            </DiditAuthButton>
+            <DiditAuthButton
+              authType="login"
+              variant="outline"
+              size="lg"
+            >
+              Login
+            </DiditAuthButton>
           </div>
         </div>
       </section>

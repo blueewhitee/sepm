@@ -12,7 +12,8 @@ import { getCities, getCityLabel } from "@/lib/city-utils"
 import { notFound } from "next/navigation"
 
 export default async function PostPage({ params }: { params: { type: string; id: string } }) {
-  const { type, id } = params
+  // Await the params object to fix the Next.js error
+  const { type, id } = await Promise.resolve(params)
 
   // Validate forum type
   if (!["events", "scams", "suggestions"].includes(type)) {

@@ -12,7 +12,7 @@ type AuthContextType = {
   isLoading: boolean
   signUp: (email: string, password: string, name: string) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
-  signOut: () => Promise<void>
+  signOut: () => Promise<{ success: boolean; error?: any }>
   isVerified: boolean
 }
 
@@ -67,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Modified to make verification status optional rather than required
   const checkUserVerification = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (data && !error) {
+        // Track verification status, but don't require it for basic functionality
         setIsVerified(data.id_verified && data.face_verified)
       } else {
         setIsVerified(false)
@@ -127,9 +129,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut()
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error("Error during signout:", error)
+        throw error
+      }
+      
+      // Explicitly clear user state
+      setUser(null)
+      setSession(null)
+      setIsVerified(false)
+      
+      return { success: true }
     } catch (error) {
       console.error("Error during signout:", error)
+      return { success: false, error }
     }
   }
 

@@ -1,35 +1,34 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { AlertTitle } from "@/components/ui/alert"
+import { AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/contexts/auth-context"
-import { supabase } from "@/lib/supabase"
+import { createComment } from "@/lib/database"
 
-type CommentFormProps = {
+interface CommentFormProps {
   postId?: string
   stayRequestId?: string
   onCommentAdded?: () => void
 }
 
 export default function CommentForm({ postId, stayRequestId, onCommentAdded }: CommentFormProps) {
-  const { user, isVerified } = useAuth()
   const [comment, setComment] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { user, isVerified } = useAuth()
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    // Set auth checked to true after initial render
     setAuthChecked(true)
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!comment.trim() || !user) return
+    if (!user) return
 
     setIsSubmitting(true)
 
@@ -37,17 +36,11 @@ export default function CommentForm({ postId, stayRequestId, onCommentAdded }: C
       const commentData = {
         content: comment,
         user_id: user.id,
-        post_id: postId,
-        stay_request_id: stayRequestId,
+        post_id: postId || null,
+        stay_request_id: stayRequestId || null,
       }
 
-      const { data, error } = await supabase.from("comments").insert(commentData).select()
-
-      if (error) {
-        console.error("Error creating comment:", error)
-        throw error
-      }
-
+      await createComment(commentData)
       setComment("")
       if (onCommentAdded) {
         onCommentAdded()
@@ -83,16 +76,32 @@ export default function CommentForm({ postId, stayRequestId, onCommentAdded }: C
     )
   }
 
+  // Verification is recommended but not required
   if (!isVerified) {
     return (
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Verification Required</AlertTitle>
-        <AlertDescription>
-          You must complete ID and face verification to comment. Please complete the verification process in your
-          account settings.
-        </AlertDescription>
-      </Alert>
+      <>
+        <Alert className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Note: Verification Recommended</AlertTitle>
+          <AlertDescription>
+            For a more trusted community experience, we recommend completing ID and face verification in your profile settings.
+          </AlertDescription>
+        </Alert>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Textarea
+            placeholder="Add a comment (max 100 words)..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            className="min-h-[100px]"
+            maxLength={500}
+            required
+          />
+          <Button type="submit" disabled={isSubmitting || !comment.trim()}>
+            {isSubmitting ? "Posting..." : "Post Comment"}
+          </Button>
+        </form>
+      </>
     )
   }
 

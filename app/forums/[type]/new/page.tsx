@@ -237,12 +237,27 @@ export default function NewPostPage({ params }: { params: { type: string } }) {
   if (!isVerified) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Alert variant="destructive">
+        <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Verification Required</AlertTitle>
-          <AlertDescription>
-            You must complete ID and face verification to create posts. Please complete the verification process in your
-            account settings.
+          <AlertTitle>Recommended: Identity Verification</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>
+              While not required, we recommend completing ID and face verification for a more trusted experience.
+              You can complete verification anytime in your account settings.
+            </p>
+            <Button 
+              variant="outline"
+              onClick={() => router.push('/profile')}
+              className="mt-2"
+            >
+              Continue to Profile Page
+            </Button>
+            <Button 
+              onClick={() => setAuthChecked(true)}
+              className="mt-2 ml-2"
+            >
+              Continue without Verification
+            </Button>
           </AlertDescription>
         </Alert>
       </div>

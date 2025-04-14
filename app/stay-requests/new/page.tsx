@@ -101,17 +101,105 @@ export default function NewStayRequestPage() {
     )
   }
 
+  // Verification is recommended but not required
   if (!isVerified) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Alert variant="destructive">
+        <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Verification Required</AlertTitle>
-          <AlertDescription>
-            You must complete ID and face verification to create stay requests. Please complete the verification process
-            in your account settings.
+          <AlertTitle>Recommended: Identity Verification</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>
+              For stay requests, we strongly recommend completing ID and face verification. 
+              This helps build trust with potential hosts.
+            </p>
+            <p>
+              You can continue without verification, but verified users typically receive more responses.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Button 
+                variant="outline"
+                onClick={() => router.push('/profile')}
+              >
+                Complete Verification
+              </Button>
+              <Button 
+                onClick={() => setAuthChecked(true)}
+              >
+                Continue without Verification
+              </Button>
+            </div>
           </AlertDescription>
         </Alert>
+        
+        <Card className="mx-auto max-w-2xl mt-6">
+          <CardHeader>
+            <CardTitle>Create a Stay Request</CardTitle>
+            <CardDescription>Request to stay with a local host in your destination city</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Select value={formData.city} onValueChange={(value) => handleSelectChange("city", value)} required>
+                  <SelectTrigger id="city">
+                    <SelectValue placeholder="Select a city" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nyc">New York City</SelectItem>
+                    <SelectItem value="tokyo">Tokyo</SelectItem>
+                    <SelectItem value="paris">Paris</SelectItem>
+                    <SelectItem value="bangkok">Bangkok</SelectItem>
+                    <SelectItem value="london">London</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="start_date">Start Date</Label>
+                  <Input id="start_date" type="date" value={formData.start_date} onChange={handleChange} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end_date">End Date</Label>
+                  <Input id="end_date" type="date" value={formData.end_date} onChange={handleChange} required />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="budget">Budget Range</Label>
+                <Select value={formData.budget} onValueChange={(value) => handleSelectChange("budget", value)} required>
+                  <SelectTrigger id="budget">
+                    <SelectValue placeholder="Select your budget range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Under $50/night">Under $50/night</SelectItem>
+                    <SelectItem value="$50-100/night">$50-100/night</SelectItem>
+                    <SelectItem value="$100-150/night">$100-150/night</SelectItem>
+                    <SelectItem value="$150-200/night">$150-200/night</SelectItem>
+                    <SelectItem value="Over $200/night">Over $200/night</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Describe what you're looking for, your preferences, and any additional information that might be helpful..."
+                  className="min-h-[150px]"
+                  required
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Creating Request..." : "Create Stay Request"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -121,7 +209,7 @@ export default function NewStayRequestPage() {
       <Card className="mx-auto max-w-2xl">
         <CardHeader>
           <CardTitle>Create a Stay Request</CardTitle>
-          <CardDescription>Share your accommodation needs with the community</CardDescription>
+          <CardDescription>Request to stay with a local host in your destination city</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
