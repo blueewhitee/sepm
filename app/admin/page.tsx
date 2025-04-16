@@ -8,7 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Search, Shield, AlertTriangle, Users, RefreshCw, UserX, CheckCircle, XCircle, Mail, Link as LinkIcon } from "lucide-react"
+// Try to separate the Lucide imports to isolate any potential issues
+import { Search } from "lucide-react"
+import { Shield } from "lucide-react"
+import { AlertTriangle } from "lucide-react"
+import { Users } from "lucide-react"
+import { RefreshCw } from "lucide-react"
+import { UserX } from "lucide-react"
+import { CheckCircle } from "lucide-react"
+import { XCircle } from "lucide-react"
+import { Mail } from "lucide-react"
+import { Link as LinkIcon } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -60,14 +70,19 @@ const ADMIN_EMAILS = ['admin@urban.couch'];
 const checkIfUserIsAdmin = async (userId) => {
   if (!userId) return false;
   
-  const { data, error } = await supabase
-    .from("users")
-    .select("is_admin")
-    .eq("id", userId)
-    .single();
-    
-  if (error || !data) return false;
-  return data.is_admin === true;
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("is_admin")
+      .eq("id", userId)
+      .single();
+      
+    if (error || !data) return false;
+    return data.is_admin === true;
+  } catch (err) {
+    console.error("Error checking admin status:", err);
+    return false;
+  }
 }
 
 export default function AdminDashboard() {
@@ -277,84 +292,38 @@ export default function AdminDashboard() {
     setIsSubmitting(true);
   
     try {
-      // Debug logging
-      console.log("Attempting to update user:", currentUserId);
-      console.log("Verification link:", verificationLink);
-  
-      // Update only the verification_link, not the verified status
-      const userUpdateResponse = await supabase
+      // ONLY update the verification_link, NOT the verified status
+      const { data: userData, error: userUpdateError } = await supabase
         .from("users")
         .update({
           verification_link: verificationLink
-          // Removed: verified: true - User will be verified after completing the verification process
+          // DO NOT SET verified: true here - that should only happen when verification is complete
         })
         .eq("id", currentUserId)
-        .select(); // Add .select() to return the updated data
+        .select();
       
-      // Log the entire response for debugging
-      console.log("User update response:", userUpdateResponse);
-      
-      if (userUpdateResponse.error) {
-        console.error("Failed to update user record:", userUpdateResponse.error);
-        alert(`Error: Failed to update user: ${userUpdateResponse.error.message}`);
+      if (userUpdateError) {
+        console.error("Failed to update user record:", userUpdateError);
+        alert(`Error: Failed to update user: ${userUpdateError.message}`);
         setIsSubmitting(false);
         return;
       }
       
-      if (!userUpdateResponse.data || userUpdateResponse.data.length === 0) {
-        console.error("Update returned no data, user might not exist or you don't have permission");
-        alert("Error: Could not verify the update was successful");
-        setIsSubmitting(false);
-        return;
-      }
-      
-      console.log("User record updated successfully:", userUpdateResponse.data[0]);
-      
-      // Update verification request as a separate operation (non-blocking)
-      try {
-        const requestUpdateResponse = await supabase
-          .from("verification_requests")
-          .update({
-            status: "approved",
-            processed_at: new Date().toISOString()
-            // Don't try to update verification_link in this table if it's causing issues
-          })
-          .eq("id", currentRequestId);
-          
-        console.log("Request update response:", requestUpdateResponse);
-        
-        if (requestUpdateResponse.error) {
-          console.warn("Could not update verification request, but continuing:", 
-            requestUpdateResponse.error);
-        }
-      } catch (requestError) {
-        console.warn("Error in request update (non-blocking):", requestError);
-      }
-      
-      // Update local state - only updating the verification_link, not the verified status
+      // Update local state - only update the verification_link, not the verified status
       setUsers(users.map(user =>
         user.id === currentUserId ? {
           ...user,
           verification_link: verificationLink
-          // Removed: verified: true
+          // Do not update verified status
         } : user
       ));
       
-      setVerificationRequests(verificationRequests.map(req =>
-        req.id === currentRequestId ? {
-          ...req,
-          status: "approved",
-          processed_at: new Date().toISOString()
-        } : req
-      ));
-      
-      // Updated success message to reflect that the user is not yet verified
-      alert("Success: Verification link has been sent to the user. The user will be verified after completing the verification process.");
+      alert("Success: Verification link has been sent to the user. They will be verified after completing the verification process.");
       setIsDialogOpen(false);
       setVerificationLink("");
       
     } catch (error) {
-      console.error("Unexpected error in submitVerificationLink:", error);
+      console.error("Unexpected error:", error);
       alert(`Error: An unexpected error occurred: ${error.message}`);
     } finally {
       setIsSubmitting(false);

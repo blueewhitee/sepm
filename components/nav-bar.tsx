@@ -57,7 +57,7 @@ export default function NavBar() {
     <header className="border-b">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="text-xl font-bold">
-          Traveler Info Hub
+          
         </Link>
 
         <nav className="flex items-center gap-4">

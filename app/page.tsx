@@ -18,7 +18,7 @@ export default function Home() {
                 <ShieldCheck className="h-4 w-4" /> Trusted Travel Community
               </div>
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-                Traveler Info Hub
+                Urban crash
               </h1>
               <p className="text-xl text-muted-foreground">
                 Discover, share, and connect with verified travelers. 

@@ -10,7 +10,7 @@ import NavBar from "@/components/nav-bar"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Traveler Info Hub",
+  title: "Urban Crash",
   description: "Share and discover city-specific information for travelers",
   generator: 'v0.dev'
 }

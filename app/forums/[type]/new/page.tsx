@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -16,10 +15,11 @@ import { useAuth } from "@/contexts/auth-context"
 import { supabase } from "@/lib/supabase"
 
 export default function NewPostPage({ params }: { params: { type: string } }) {
-  const { type } = params
+  const [forumType, setForumType] = useState("events") // Default value
   const router = useRouter()
   const { user, isVerified } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
+
   const [formData, setFormData] = useState({
     title: "",
     city: "",
@@ -27,16 +27,21 @@ export default function NewPostPage({ params }: { params: { type: string } }) {
     // Event specific fields
     event_date: "",
     event_location: "",
-    // Scam specific fields
-    scam_type: "",
-    scam_location: "",
     // Suggestion specific fields
     place_name: "",
     place_address: "",
   })
+  const [scamType, setScamType] = useState("")
+  const [scamLocation, setScamLocation] = useState("")
+
+  useEffect(() => {
+    if (params && params.type) {
+      setForumType(params.type)
+    }
+  }, [params])
 
   const getFormTitle = () => {
-    switch (type) {
+    switch (forumType) {
       case "events":
         return "Share a City Event"
       case "scams":
@@ -49,7 +54,7 @@ export default function NewPostPage({ params }: { params: { type: string } }) {
   }
 
   const getFormDescription = () => {
-    switch (type) {
+    switch (forumType) {
       case "events":
         return "Share details about an upcoming event in your city"
       case "scams":
@@ -71,7 +76,7 @@ export default function NewPostPage({ params }: { params: { type: string } }) {
   }
 
   const getFormFields = () => {
-    switch (type) {
+    switch (forumType) {
       case "events":
         return (
           <>
@@ -101,22 +106,22 @@ export default function NewPostPage({ params }: { params: { type: string } }) {
         return (
           <>
             <div className="space-y-2">
-              <Label htmlFor="scam_type">Scam Type</Label>
+              <Label htmlFor="scam_type">Type of Scam</Label>
               <Input
                 id="scam_type"
-                value={formData.scam_type}
-                onChange={handleChange}
-                placeholder="Taxi Overcharge"
+                value={scamType}
+                onChange={(e) => setScamType(e.target.value)}
+                placeholder="e.g., Phone scam, Email phishing, etc."
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="scam_location">Location</Label>
+              <Label htmlFor="scam_location">Scam Location</Label>
               <Input
                 id="scam_location"
-                value={formData.scam_location}
-                onChange={handleChange}
-                placeholder="Near Airport"
+                value={scamLocation}
+                onChange={(e) => setScamLocation(e.target.value)}
+                placeholder="Where did this scam occur?"
                 required
               />
             </div>
@@ -154,62 +159,48 @@ export default function NewPostPage({ params }: { params: { type: string } }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) return
-
     setIsSubmitting(true)
 
     try {
-      const postData = {
+      const postData: any = {
         title: formData.title,
         content: formData.content,
         city: formData.city,
-        forum_type: type,
+        forum_type: forumType,
         user_id: user.id,
       }
 
-      // Add type-specific fields
-      if (type === "events") {
-        Object.assign(postData, {
-          event_date: formData.event_date,
-          event_location: formData.event_location,
-        })
-      } else if (type === "scams") {
-        Object.assign(postData, {
-          scam_type: formData.scam_type,
-          scam_location: formData.scam_location,
-        })
-      } else if (type === "suggestions") {
-        Object.assign(postData, {
-          place_name: formData.place_name,
-          place_address: formData.place_address,
-        })
+      if (forumType === "events") {
+        postData.event_date = formData.event_date
+        postData.event_location = formData.event_location
+      } else if (forumType === "scams") {
+        postData.scam_type = scamType
+        postData.scam_location = scamLocation
+      } else if (forumType === "suggestions") {
+        postData.place_name = formData.place_name
+        postData.place_address = formData.place_address
       }
 
       const { data, error } = await supabase.from("posts").insert(postData).select()
 
-      if (error) {
-        console.error("Error creating post:", error)
-        throw error
-      }
+      if (error) throw error
 
-      router.push(`/forums/${type}`)
+      router.push(`/forums/${forumType}`)
     } catch (error) {
-      console.error("Error submitting form:", error)
+      console.error("Error creating post:", error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // Check authentication and verification status
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    // Set auth checked to true after initial render
     setAuthChecked(true)
   }, [])
 
   if (!authChecked) {
-    return null // Don't render anything until we've checked auth status
+    return null
   }
 
   if (!user) {
@@ -245,17 +236,14 @@ export default function NewPostPage({ params }: { params: { type: string } }) {
               While not required, we recommend completing ID and face verification for a more trusted experience.
               You can complete verification anytime in your account settings.
             </p>
-            <Button 
+            <Button
               variant="outline"
-              onClick={() => router.push('/profile')}
+              onClick={() => router.push("/profile")}
               className="mt-2"
             >
               Continue to Profile Page
             </Button>
-            <Button 
-              onClick={() => setAuthChecked(true)}
-              className="mt-2 ml-2"
-            >
+            <Button onClick={() => setAuthChecked(true)} className="mt-2 ml-2">
               Continue without Verification
             </Button>
           </AlertDescription>
@@ -286,7 +274,11 @@ export default function NewPostPage({ params }: { params: { type: string } }) {
 
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
-              <Select value={formData.city} onValueChange={(value) => handleSelectChange("city", value)} required>
+              <Select
+                value={formData.city}
+                onValueChange={(value) => handleSelectChange("city", value)}
+                required
+              >
                 <SelectTrigger id="city">
                   <SelectValue placeholder="Select a city" />
                 </SelectTrigger>
