@@ -43,14 +43,22 @@ export default function SignUpPage() {
       const { error } = await signUp(email, password, name)
       
       if (error) {
+        console.error("Signup error:", error);
         setError(error.message || "Failed to create account")
         setIsLoading(false)
         return
       }
       
-      // Redirect to login page with success message
-      router.push("/auth/login?signup=success")
+      // Show success message before redirecting
+      setError(null)
+      
+      // Add a small delay before redirecting to ensure the user sees the success state
+      setTimeout(() => {
+        // Redirect to login page with success message
+        router.push("/auth/login?signup=success")
+      }, 1000);
     } catch (err: any) {
+      console.error("Unhandled signup error:", err);
       setError(err.message || "An unexpected error occurred")
       setIsLoading(false)
     }

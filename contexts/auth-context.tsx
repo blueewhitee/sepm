@@ -75,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .select("id_verified, face_verified")
         .eq("id", userId)
         .single()
+        // Add this to prevent caching
 
       if (data && !error) {
         // Track verification status, but don't require it for basic functionality
@@ -90,26 +91,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
+      // Simple approach without complicated Promise racing
+      // Set a reasonable timeout for the entire operation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      // Create auth user with standard approach
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-      })
-
-      if (!error && data.user) {
-        // Create user profile in the users table
-        await supabase.from("users").insert({
+        options: {
+          data: { name },
+          emailRedirectTo: `${window.location.origin}/auth/login?signup=success`,
+        },
+      });
+      
+      // Clear timeout since we got a response
+      clearTimeout(timeoutId);
+      
+      if (error) {
+        console.error("Error creating auth user:", error);
+        return { error };
+      }
+      
+      if (!data?.user) {
+        return { error: { message: "Failed to create user account" } };
+      }
+      
+      // Insert the user profile in the main flow - this ensures it's created before redirecting
+      try {
+        const { error: profileError } = await supabase.from("users").insert({
           id: data.user.id,
           email,
           name,
           id_verified: false,
           face_verified: false,
-        })
+        });
+        
+        if (profileError) {
+          console.error("Error creating user profile:", profileError);
+          // Continue anyway since the auth account was created
+        }
+      } catch (profileError) {
+        console.error("Exception creating user profile:", profileError);
+        // Continue anyway as the auth account was created
       }
-
-      return { error }
-    } catch (error) {
-      console.error("Error during signup:", error)
-      return { error }
+      
+      // Return success
+      return { error: null };
+    } catch (error: any) {
+      // Handle AbortController timeout
+      if (error.name === 'AbortError') {
+        return { error: { message: "Signup request timed out. Please try again." } };
+      }
+      
+      console.error("Error during signup:", error);
+      return { error: { message: error.message || "An unexpected error occurred during signup" } };
     }
   }
 

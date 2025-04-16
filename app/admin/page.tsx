@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Search, Shield, AlertTriangle, Users, RefreshCw, UserX, CheckCircle, XCircle, Mail } from "lucide-react"
+import { Search, Shield, AlertTriangle, Users, RefreshCw, UserX, CheckCircle, XCircle, Mail, Link as LinkIcon } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -19,36 +19,99 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+
+// Add at the top of the file, after imports
+interface User {
+  id: string;
+  name?: string;
+  email: string;
+  is_blocked?: boolean;
+  id_verified?: boolean;
+  face_verified?: boolean;
+  verification_link?: string;
+  created_at: string;
+}
+
+interface VerificationRequest {
+  id: string;
+  user_id: string;
+  verification_type: "id" | "face" | "check";
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  processed_at?: string;
+  verification_link?: string;
+  users?: {
+    name?: string;
+    email: string;
+  };
+}
 
 // Admin role check - in a real app, you would store admin status in your database
-const ADMIN_EMAILS = ['admin@example.com', 'your-email@example.com'];
+const ADMIN_EMAILS = ['admin@urban.couch'];
+
+// Admin role check - checking database flag
+const checkIfUserIsAdmin = async (userId) => {
+  if (!userId) return false;
+  
+  const { data, error } = await supabase
+    .from("users")
+    .select("is_admin")
+    .eq("id", userId)
+    .single();
+    
+  if (error || !data) return false;
+  return data.is_admin === true;
+}
 
 export default function AdminDashboard() {
   const router = useRouter()
   const { user, isLoading } = useAuth()
   const [activeTab, setActiveTab] = useState("users")
-  const [users, setUsers] = useState([])
-  const [verificationRequests, setVerificationRequests] = useState([])
+  const [users, setUsers] = useState<User[]>([])
+  const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [verificationLink, setVerificationLink] = useState("")
+  const [currentRequestId, setCurrentRequestId] = useState("")
+  const [currentUserId, setCurrentUserId] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     // Check if user is admin
-    if (!isLoading) {
-      if (!user) {
-        router.push("/auth/login")
-      } else {
-        const userIsAdmin = ADMIN_EMAILS.includes(user.email);
-        setIsAdmin(userIsAdmin)
-        
-        if (!userIsAdmin) {
-          router.push("/dashboard")
+    const checkAdminStatus = async () => {
+      if (!isLoading) {
+        if (!user) {
+          router.push("/auth/login")
         } else {
-          fetchData()
+          // First check hardcoded list for development
+          const isInAdminList = ADMIN_EMAILS.includes(user.email);
+          
+          // Then check database flag
+          const hasAdminFlag = await checkIfUserIsAdmin(user.id);
+          
+          const userIsAdmin = isInAdminList || hasAdminFlag;
+          setIsAdmin(userIsAdmin)
+          
+          if (!userIsAdmin) {
+            router.push("/dashboard")
+          } else {
+            fetchData()
+          }
         }
       }
     }
+    
+    checkAdminStatus();
   }, [user, isLoading, router])
 
   const fetchData = async () => {
@@ -63,13 +126,16 @@ export default function AdminDashboard() {
       if (usersError) throw usersError
       setUsers(usersData || [])
 
-      // Fetch verification requests
+      // Fetch verification requests - Ensure user_id is selected directly
       const { data: requestsData, error: requestsError } = await supabase
         .from("verification_requests")
-        .select("*, users(email, name)")
+        // Select all columns from verification_requests, including user_id
+        // and explicitly select related user's email and name
+        .select("*, user_id, users(email, name)") 
         .order("created_at", { ascending: false })
       
       if (requestsError) throw requestsError
+      console.log("Fetched requests:", requestsData); // Add log to inspect data
       setVerificationRequests(requestsData || [])
 
     } catch (error) {
@@ -79,7 +145,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleBlockUser = async (userId) => {
+  const handleBlockUser = async (userId :string) => {
     try {
       const { error } = await supabase
         .from("users")
@@ -97,7 +163,7 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleUnblockUser = async (userId) => {
+  const handleUnblockUser = async (userId:string) => {
     try {
       const { error } = await supabase
         .from("users")
@@ -115,7 +181,11 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleApproveVerification = async (requestId, userId) => {
+  const handleApproveVerification = async (
+    requestId: string, 
+    userId: string,
+    verificationType: string
+  ) => {
     try {
       // 1. Update request status
       const { error: updateError } = await supabase
@@ -123,22 +193,67 @@ export default function AdminDashboard() {
         .update({ status: "approved", processed_at: new Date().toISOString() })
         .eq("id", requestId)
       
-      if (updateError) throw updateError
+      if (updateError) {
+        // Handle unique constraint violation error gracefully
+        if (updateError.message && updateError.message.includes("idx_verification_requests_user_id")) {
+          console.log("User already has a verification request. Updating user verification status directly.");
+          
+          // Skip updating the request and go directly to updating the user's verification status
+        } else {
+          throw updateError;
+        }
+      }
 
-      // 2. Send verification link (in real application, this would trigger an email)
-      // Here we'll just update local state for demo purposes
+      // 2. For 'check' verification type, also update the user's verification status
+      if (verificationType === "check") {
+        // Log the user ID to make sure it's valid
+        console.log("Updating verification status for user ID:", userId);
+        
+        // Check if the user ID is valid
+        if (!userId) {
+          console.error("Invalid user ID:", userId);
+          throw new Error("Invalid user ID");
+        }
+        
+        // Update the user's verification status
+        const { data: userData, error: userUpdateError } = await supabase
+          .from("users")
+          .update({ 
+            id_verified: true, // Sets both to true
+            face_verified: true
+          })
+          .eq("id", userId)
+          .select();
+        
+        if (userUpdateError) {
+          console.error("Error updating user verification status:", userUpdateError);
+          // Show full error details for debugging
+          console.error("Error details:", JSON.stringify(userUpdateError));
+          alert("Verification request approved, but failed to update user's verified status automatically.");
+        } else {
+          console.log("Successfully updated user verification status:", userData);
+        }
+      }
+
+      // 3. Update local state
       setVerificationRequests(verificationRequests.map(req => 
         req.id === requestId ? { ...req, status: "approved", processed_at: new Date().toISOString() } : req
-      ))
+      ));
 
-      // In a real application, you would call an API to send the email with the verification link
-      alert(`Verification link has been sent to the user's email`)
+      // Update the user's verification status in the users state
+      setUsers(users.map(user => 
+        user.id === userId ? { ...user, id_verified: true, face_verified: true } : user
+      ));
+      
+      // Show success message
+      alert("Verification request approved successfully!");
     } catch (error) {
-      console.error("Error approving verification:", error)
+      console.error("Error approving verification:", error);
+      alert(`Error approving verification: ${error.message || "Unknown error"}`);
     }
   }
 
-  const handleRejectVerification = async (requestId) => {
+  const handleRejectVerification = async (requestId: string) => {
     try {
       const { error } = await supabase
         .from("verification_requests")
@@ -153,6 +268,115 @@ export default function AdminDashboard() {
       ))
     } catch (error) {
       console.error("Error rejecting verification:", error)
+    }
+  }
+
+  const openVerificationDialog = (requestId: string, userId: string) => {
+    // Add a check to ensure userId is valid before opening
+    if (!userId) {
+        console.error("Cannot open verification dialog: User ID is missing for request ID:", requestId);
+        alert("Error: Could not identify the user associated with this request.");
+        return;
+    }
+    setCurrentRequestId(requestId);
+    setCurrentUserId(userId); // This should now be a valid UUID
+    setVerificationLink(""); // Reset link field
+    setIsDialogOpen(true);
+  }
+
+  const submitVerificationLink = async () => {
+    if (!verificationLink.trim()) {
+      alert("Please enter a valid verification link");
+      return;
+    }
+    setIsSubmitting(true);
+    
+    try {
+      console.log("Submitting verification link:", {
+        requestId: currentRequestId,
+        userId: currentUserId,
+        link: verificationLink
+      });
+      
+      // First update the user record - ALSO update the verification status
+      const { data: userData, error: userUpdateError } = await supabase
+        .from("users")
+        .update({ 
+          verification_link: verificationLink,
+          // Also mark the user as verified when sending a link
+          id_verified: true, // Sets both to true
+          face_verified: true
+        })
+        .eq("id", currentUserId)
+        .select();
+      
+      if (userUpdateError) {
+        // Handle potential missing column error gracefully
+        if (userUpdateError.message && userUpdateError.message.includes("column")) {
+          const confirmMigration = confirm("Database schema might be missing the verification_link column in 'users' table. Would you like to see instructions to add it?");
+          if (confirmMigration) {
+            alert("Please execute the add-verification-link-column.sql migration file or manually add a 'verification_link' text column to your 'users' table.");
+          }
+          // Continue even if user update fails, try updating the request
+        } else {
+          throw userUpdateError; // Rethrow other user update errors
+        }
+      } else {
+        console.log("Updated user data:", userData);
+      }
+      
+      // Now update the verification request - Mark as approved and add the link
+      const { data: requestData, error: updateError } = await supabase
+        .from("verification_requests")
+        .update({ 
+          status: "approved", // Mark as approved when link is sent
+          processed_at: new Date().toISOString(),
+          verification_link: verificationLink
+        })
+        .eq("id", currentRequestId)
+        .select();
+        
+      if (updateError) {
+        console.error("Error updating verification request:", updateError);
+        // Handle potential missing column error gracefully
+        if (updateError.message && updateError.message.includes("column")) {
+           alert("Warning: Could not save link in verification_requests table (schema might be outdated), but it should be saved in the user record if possible.");
+        } else {
+          throw updateError; // Rethrow other request update errors
+        }
+      } else {
+        console.log("Updated verification request:", requestData);
+      }
+
+      // Update local state to reflect the change immediately in BOTH sections
+      setVerificationRequests(verificationRequests.map(req => 
+        req.id === currentRequestId ? { 
+          ...req, 
+          status: "approved", // Ensure status is approved
+          processed_at: new Date().toISOString(),
+          verification_link: verificationLink
+        } : req
+      ));
+      
+      // IMPORTANT: Also update the users array to reflect verified status
+      setUsers(users.map(user => 
+        user.id === currentUserId ? { 
+          ...user, 
+          id_verified: true,
+          face_verified: true,
+          verification_link: verificationLink
+        } : user
+      ));
+
+      // Close dialog and inform admin
+      setIsDialogOpen(false);
+      alert(`Verification link has been saved and the request marked as approved. The link is now visible to the user.`);
+      
+    } catch (error) {
+      console.error("Error saving verification link:", error);
+      alert(`Error saving verification link: ${error.message || "Unknown error"}`);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -336,7 +560,12 @@ export default function AdminDashboard() {
                           {request.users?.name || "N/A"}
                           <div className="text-xs text-muted-foreground">{request.users?.email}</div>
                         </TableCell>
-                        <TableCell>{request.verification_type === "id" ? "ID Verification" : "Face Verification"}</TableCell>
+                        <TableCell>
+                          {request.verification_type === "id" ? "ID Verification" : 
+                           request.verification_type === "check" ? "Verification Check" : 
+                           request.verification_type === "face" ? "Face Verification" :
+                           request.verification_type /* Fallback */ }
+                        </TableCell>
                         <TableCell>
                           {request.status === "pending" && (
                             <Badge variant="outline" className="bg-amber-100 text-amber-800">Pending</Badge>
@@ -350,37 +579,79 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell>{new Date(request.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
+                          {/* --- Action Buttons Logic --- */}
+                          
+                          {/* Case 1: Pending Request */}
                           {request.status === "pending" && (
-                            <div className="flex space-x-2">
-                              <Button 
-                                onClick={() => handleApproveVerification(request.id, request.user_id)} 
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700"
-                              >
-                                <CheckCircle className="mr-1 h-3 w-3" />
-                                Approve
-                              </Button>
-                              <Button 
-                                onClick={() => handleRejectVerification(request.id)} 
-                                variant="outline" 
-                                size="sm"
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <XCircle className="mr-1 h-3 w-3" />
-                                Reject
-                              </Button>
-                            </div>
+                            <>
+                              {/* Subcase 1.1: Pending 'check' request -> Show Approve/Reject */}
+                              {request.verification_type === "check" && (
+                                <div className="flex space-x-2">
+                                  <Button 
+                                    onClick={() => handleApproveVerification(request.id, request.user_id, request.verification_type)} 
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    <CheckCircle className="mr-1 h-3 w-3" />
+                                    Approve
+                                  </Button>
+                                  <Button 
+                                    onClick={() => handleRejectVerification(request.id)} 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <XCircle className="mr-1 h-3 w-3" />
+                                    Reject
+                                  </Button>
+                                </div>
+                              )}
+                              
+                              {/* Subcase 1.2: Pending 'id' or 'face' request -> Show Send Link */}
+                              {(request.verification_type === "id" || request.verification_type === "face") && (
+                                <Button 
+                                  // Use request.user_id directly instead of request.users?.id
+                                  onClick={() => openVerificationDialog(request.id, request.user_id)} 
+                                  variant="outline" 
+                                  size="sm"
+                                >
+                                  <LinkIcon className="mr-1 h-3 w-3" />
+                                  Send Link
+                                </Button>
+                              )}
+                            </>
                           )}
+                          
+                          {/* Case 2: Approved Request */}
                           {request.status === "approved" && (
-                            <Button 
-                              onClick={() => alert(`Sending another verification email to ${request.users?.email}`)} 
-                              variant="outline" 
-                              size="sm"
-                            >
-                              <Mail className="mr-1 h-3 w-3" />
-                              Resend Email
-                            </Button>
+                            <>
+                              {/* Subcase 2.1: Approved 'id' or 'face' request WITHOUT a link yet -> Show Send Link */}
+                              {(request.verification_type === "id" || request.verification_type === "face") && !request.verification_link && (
+                                <Button 
+                                  // Use request.user_id directly here as well
+                                  onClick={() => openVerificationDialog(request.id, request.user_id)} 
+                                  variant="outline" 
+                                  size="sm"
+                                >
+                                  <LinkIcon className="mr-1 h-3 w-3" />
+                                  Send/Update Link
+                                </Button>
+                              )}
+                              
+                              {/* Subcase 2.2: Approved 'check' request OR Approved 'id'/'face' WITH link -> Show nothing or confirmation */}
+                              {/* (No button needed here, status badge is sufficient) */}
+                              {((request.verification_type === "id" || request.verification_type === "face") && request.verification_link) && (
+                                 <span className="text-xs text-muted-foreground italic">Link Sent</span>
+                              )}
+                               {request.verification_type === "check" && (
+                                 <span className="text-xs text-muted-foreground italic">User Verified</span>
+                              )}
+                            </>
                           )}
+                          
+                          {/* Case 3: Rejected Request -> Show nothing */}
+                          {/* (No button needed here, status badge is sufficient) */}
+
                         </TableCell>
                       </TableRow>
                     ))}
@@ -391,6 +662,35 @@ export default function AdminDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Verification Link</DialogTitle>
+            <DialogDescription>
+              Enter the verification link to send to the user.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            type="text"
+            placeholder="Enter verification link..."
+            value={verificationLink}
+            onChange={(e) => setVerificationLink(e.target.value)}
+          />
+          <DialogFooter>
+            <Button onClick={submitVerificationLink} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Send"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

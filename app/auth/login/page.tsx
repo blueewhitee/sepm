@@ -33,12 +33,16 @@ export default function LoginPage() {
         return
       }
       
+      // Success - redirect to dashboard
+      console.log("Login successful, redirecting to dashboard...");
+      
       // Add a small delay to ensure auth state is updated before redirect
       setTimeout(() => {
         // Use replace to prevent back navigation to login page
-        router.replace("/dashboard")
-      }, 300)
+        router.push("/dashboard");
+      }, 500);
     } catch (err: any) {
+      console.error("Login error:", err);
       setError(err.message || "An unexpected error occurred")
       setIsLoading(false)
     }

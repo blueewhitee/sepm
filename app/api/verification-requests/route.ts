@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate verification type
-    if (!["id", "face"].includes(verificationType)) {
+    if (!["id", "face", "check"].includes(verificationType)) {
       return NextResponse.json(
         { error: "Invalid verification type" },
         { status: 400 }
@@ -64,12 +64,13 @@ export async function POST(req: NextRequest) {
       .insert({
         user_id: userId,
         verification_type: verificationType,
-        additional_info: additionalInfo || {},
+        additional_info: additionalInfo || {}, // Ensure this matches your DB schema (e.g., jsonb)
+        // status: 'pending' // Status is likely set by default in DB or trigger
       })
       .select()
 
     if (error) {
-      console.error("Error creating verification request:", error)
+      console.error("Error creating verification request:", error) // Check server logs for this message
       return NextResponse.json(
         { error: "Failed to create verification request" },
         { status: 500 }
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       data 
     })
   } catch (error) {
-    console.error("Server error:", error)
+    console.error("Server error:", error) // Check server logs for this message
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -119,10 +120,15 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ requests: data })
   } catch (error) {
-    console.error("Server error:", error)
+    console.error("Server error:", error) // Check server logs for this message
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     )
   }
+}
+
+// Add an OPTIONS handler to handle CORS preflight requests
+export async function OPTIONS() {
+  return NextResponse.json({}, { status: 200 });
 }

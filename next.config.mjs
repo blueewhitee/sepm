@@ -27,6 +27,17 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  webpack: (config, { isServer }) => {
+    // Fix for Supabase node-fetch issues
+    if (isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        // This prevents the error with node-fetch
+        '@supabase/node-fetch': 'node-fetch'
+      }
+    }
+    return config
+  },
 }
 
 if (userConfig) {
