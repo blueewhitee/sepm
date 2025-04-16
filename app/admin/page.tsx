@@ -200,45 +200,23 @@ export default function AdminDashboard() {
         .eq("id", requestId)
       
       if (updateError) {
-        // Handle unique constraint violation error gracefully
-        if (updateError.message && updateError.message.includes("idx_verification_requests_user_id")) {
-          console.log("User already has a verification request. Updating user verification status directly.");
-          
-          // Skip updating the request and go directly to updating the user's verification status
-        } else {
-          throw updateError;
-        }
+        console.error("Error updating verification request:", updateError);
+        throw updateError;
       }
 
-      // 2. For 'check' verification type, also update the user's verification status
-      // We'll keep this behavior for 'check' type, but not for id/face verification which requires link completion
-      if (verificationType === "check") {
-        // Log the user ID to make sure it's valid
-        console.log("Updating verification status for user ID:", userId);
-        
-        // Check if the user ID is valid
-        if (!userId) {
-          console.error("Invalid user ID:", userId);
-          throw new Error("Invalid user ID");
-        }
-        
-        // Update the user's verification status
-        const { data: userData, error: userUpdateError } = await supabase
-          .from("users")
-          .update({ 
-            verified: true // Sets verified to true only for 'check' type
-          })
-          .eq("id", userId)
-          .select();
-        
-        if (userUpdateError) {
-          console.error("Error updating user verification status:", userUpdateError);
-          // Show full error details for debugging
-          console.error("Error details:", JSON.stringify(userUpdateError));
-          alert("Verification request approved, but failed to update user's verified status automatically.");
-        } else {
-          console.log("Successfully updated user verification status:", userData);
-        }
+      // 2. Update the user's verification status
+      // Using the correct column name 'verified' instead of 'verification_status'
+      const { data: userData, error: userUpdateError } = await supabase
+        .from("users")
+        .update({ 
+          verified: true // This matches your actual column name in the schema
+        })
+        .eq("id", userId)
+        .select();
+      
+      if (userUpdateError) {
+        console.error("Error updating user verification status:", userUpdateError);
+        throw userUpdateError;
       }
 
       // 3. Update local state
@@ -246,19 +224,13 @@ export default function AdminDashboard() {
         req.id === requestId ? { ...req, status: "approved", processed_at: new Date().toISOString() } : req
       ));
 
-      // Update the user's verification status in the users state, but only for 'check' type
-      if (verificationType === "check") {
-        setUsers(users.map(user => 
-          user.id === userId ? { ...user, verified: true } : user
-        ));
-      }
+      // Update the user's verification status in the users state
+      setUsers(users.map(user => 
+        user.id === userId ? { ...user, verified: true } : user
+      ));
       
       // Show success message
-      if (verificationType === "check") {
-        alert("Verification request approved and user has been verified!");
-      } else {
-        alert("Verification request approved! A verification link must be sent to complete the process.");
-      }
+      alert("Verification request approved and user has been verified!");
     } catch (error) {
       console.error("Error approving verification:", error);
       alert(`Error approving verification: ${error.message || "Unknown error"}`);
