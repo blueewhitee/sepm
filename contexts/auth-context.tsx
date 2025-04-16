@@ -67,19 +67,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Modified to make verification status optional rather than required
+  // Modified to use the single verified field from the database
   const checkUserVerification = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from("users")
-        .select("id_verified, face_verified")
+        .select("verified")
         .eq("id", userId)
         .single()
-        // Add this to prevent caching
 
       if (data && !error) {
-        // Track verification status, but don't require it for basic functionality
-        setIsVerified(data.id_verified && data.face_verified)
+        // Simply use the single verified field
+        setIsVerified(!!data.verified)
       } else {
         setIsVerified(false)
       }
@@ -124,8 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: data.user.id,
           email,
           name,
-          id_verified: false,
-          face_verified: false,
+          verified: false // Using the single verified field from the schema
         });
         
         if (profileError) {

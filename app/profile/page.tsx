@@ -25,7 +25,7 @@ export default function ProfilePage() {
 
   // Function to check verification status
   const checkVerificationStatus = async (userId) => {
-    if (!userId) return;
+    if (!userId) return false;
     
     try {
       console.log("Checking verification status for user:", userId);
@@ -33,29 +33,36 @@ export default function ProfilePage() {
       // IMPORTANT: Do a direct database fetch with no caching to get the latest status
       const { data, error } = await supabase
         .from("users")
-        .select("id_verified, face_verified") // Fetches the relevant fields
+        .select("verified") // Use the single verified field
         .eq("id", userId)
-        .single()
-         // Add this to prevent caching issues
+        .single();
       
       console.log("DEBUG - User ID:", userId);
-      console.log("DEBUG - Database response:", data);
-
-      if (!error && data) {
-        // Correctly checks if BOTH are true
-        const isVerified = data.id_verified && data.face_verified; 
-        console.log("Raw verification data:", data);
+      
+      if (error) {
+        // Properly log the error with all details
+        console.error("Error in verification status check:", JSON.stringify(error));
+        return false;
+      }
+      
+      if (data) {
+        console.log("DEBUG - Database response:", data);
+        // Simply use the verified field directly
+        const isVerified = data.verified === true; // Force boolean value
         console.log("Verification status updated:", isVerified);
         
         // Updates the state used for display
         setVerificationStatus(isVerified); 
         return isVerified;
-      } else if (error) {
-        console.error("Error in verification status check:", error);
       }
+      
+      // If we didn't get any data but also no error, assume not verified
+      setVerificationStatus(false);
       return false;
     } catch (error) {
-      console.error("Exception checking verification status:", error);
+      // Properly log any caught exceptions
+      console.error("Exception checking verification status:", error ? JSON.stringify(error) : "Unknown error");
+      setVerificationStatus(false);
       return false;
     }
   };
@@ -288,8 +295,7 @@ export default function ProfilePage() {
           {user && (
             <VerificationRequestCard
               userId={user.id}
-              isIdVerified={verificationStatus}
-              isFaceVerified={verificationStatus}
+              isVerified={verificationStatus}
               onRequestSuccess={handleRefreshStatus}
             />
           )}
@@ -309,15 +315,8 @@ export default function ProfilePage() {
                     You have administrator privileges. You can access the admin dashboard to manage users and verification requests.
                   </AlertDescription>
                 </Alert>
-              ) : verificationStatus ? (
-                <Alert className="bg-green-50 text-green-700 border-green-200">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Verification Complete</AlertTitle>
-                  <AlertDescription>
-                    Your account has been fully verified. You can access all platform features.
-                  </AlertDescription>
-                </Alert>
               ) : verificationLink ? (
+                // Show verification link with higher priority
                 <Alert className="bg-blue-50 text-blue-700 border-blue-200">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Verification Link Available</AlertTitle>
@@ -335,6 +334,18 @@ export default function ProfilePage() {
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                     </div>
+                    <p className="text-xs mt-2">
+                      <strong>Note:</strong> You will only be fully verified after completing the process at this link.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              ) : verificationStatus ? (
+                // Only show verification complete when there's no link but user is verified
+                <Alert className="bg-green-50 text-green-700 border-green-200">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Verification Complete</AlertTitle>
+                  <AlertDescription>
+                    Your account has been fully verified. You can access all platform features.
                   </AlertDescription>
                 </Alert>
               ) : (

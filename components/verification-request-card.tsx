@@ -10,15 +10,13 @@ import { toast } from "@/components/ui/use-toast"
 
 interface VerificationRequestCardProps {
   userId: string
-  isIdVerified: boolean
-  isFaceVerified: boolean
+  isVerified?: boolean // Single verification field
   onRequestSuccess?: () => void
 }
 
 export default function VerificationRequestCard({
   userId,
-  isIdVerified,
-  isFaceVerified,
+  isVerified = false, // Default to false
   onRequestSuccess
 }: VerificationRequestCardProps) {
   const [userRequests, setUserRequests] = useState<any[]>([])
@@ -95,7 +93,7 @@ export default function VerificationRequestCard({
     }
   }
 
-  const getPendingRequest = (type: 'id' | 'face') => {
+  const getPendingRequest = (type: 'id' | 'face' | 'check') => {
     return userRequests.find(req => 
       req.verification_type === type && 
       req.status === 'pending'
@@ -103,7 +101,7 @@ export default function VerificationRequestCard({
   }
 
   const idPendingRequest = getPendingRequest('id')
-  const facePendingRequest = getPendingRequest('face')
+  const checkPendingRequest = getPendingRequest('check')
 
   if (isLoading) {
     return (
@@ -125,7 +123,7 @@ export default function VerificationRequestCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col space-y-4">
-          {/* Request Verification Section (formerly ID Verification) */}
+          {/* Request Verification Section */}
           <div className="flex items-start justify-between rounded-lg border p-4">
             <div className="flex items-start space-x-3">
               <div className="mt-0.5 bg-primary/10 p-2 rounded-full">
@@ -135,7 +133,7 @@ export default function VerificationRequestCard({
                 <h3 className="font-medium">Request Verification</h3>
                 <p className="text-sm text-muted-foreground">Submit a verification request to the admin</p>
                 
-                {isIdVerified ? (
+                {isVerified ? (
                   <Badge variant="outline" className="mt-2 bg-green-50 text-green-700 border-green-200">
                     <ShieldCheck className="mr-1 h-3 w-3" />
                     Verified
@@ -149,7 +147,7 @@ export default function VerificationRequestCard({
               </div>
             </div>
             
-            {!isIdVerified && !idPendingRequest && (
+            {!isVerified && !idPendingRequest && (
               <Button 
                 variant="outline" 
                 size="sm"
@@ -166,7 +164,7 @@ export default function VerificationRequestCard({
             )}
           </div>
           
-          {/* Check Verification Section (formerly Face Verification) */}
+          {/* Check Verification Section */}
           <div className="flex items-start justify-between rounded-lg border p-4">
             <div className="flex items-start space-x-3">
               <div className="mt-0.5 bg-primary/10 p-2 rounded-full">
@@ -176,12 +174,12 @@ export default function VerificationRequestCard({
                 <h3 className="font-medium">Check Verification</h3>
                 <p className="text-sm text-muted-foreground">Check the status of your verification</p>
                 
-                {isFaceVerified ? (
+                {isVerified ? (
                   <Badge variant="outline" className="mt-2 bg-green-50 text-green-700 border-green-200">
                     <ShieldCheck className="mr-1 h-3 w-3" />
                     Verified
                   </Badge>
-                ) : facePendingRequest ? (
+                ) : checkPendingRequest ? (
                   <Badge variant="outline" className="mt-2 bg-amber-50 text-amber-700 border-amber-200">
                     <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                     Pending Approval
@@ -190,7 +188,7 @@ export default function VerificationRequestCard({
               </div>
             </div>
             
-            {!isFaceVerified && !facePendingRequest && (
+            {!isVerified && !checkPendingRequest && (
               <Button 
                 variant="outline" 
                 size="sm"

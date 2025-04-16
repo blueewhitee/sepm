@@ -34,8 +34,7 @@ interface User {
   name?: string;
   email: string;
   is_blocked?: boolean;
-  id_verified?: boolean;
-  face_verified?: boolean;
+  verified?: boolean; // Using the single verified field from the schema
   verification_link?: string;
   created_at: string;
 }
@@ -117,25 +116,32 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setIsLoadingData(true)
     try {
-      // Fetch users
+      // Fetch users with better error handling
       const { data: usersData, error: usersError } = await supabase
         .from("users")
         .select("*")
         .order("created_at", { ascending: false })
       
-      if (usersError) throw usersError
+      if (usersError) {
+        console.error("Error fetching users:", usersError)
+        throw usersError
+      }
+      
+      console.log("Fetched users:", usersData?.length || 0)
       setUsers(usersData || [])
 
-      // Fetch verification requests - Ensure user_id is selected directly
+      // Fetch verification requests with better error handling
       const { data: requestsData, error: requestsError } = await supabase
         .from("verification_requests")
-        // Select all columns from verification_requests, including user_id
-        // and explicitly select related user's email and name
         .select("*, user_id, users(email, name)") 
         .order("created_at", { ascending: false })
       
-      if (requestsError) throw requestsError
-      console.log("Fetched requests:", requestsData); // Add log to inspect data
+      if (requestsError) {
+        console.error("Error fetching verification requests:", requestsError)
+        throw requestsError
+      }
+      
+      console.log("Fetched verification requests:", requestsData?.length || 0)
       setVerificationRequests(requestsData || [])
 
     } catch (error) {
@@ -205,6 +211,7 @@ export default function AdminDashboard() {
       }
 
       // 2. For 'check' verification type, also update the user's verification status
+      // We'll keep this behavior for 'check' type, but not for id/face verification which requires link completion
       if (verificationType === "check") {
         // Log the user ID to make sure it's valid
         console.log("Updating verification status for user ID:", userId);
@@ -219,8 +226,7 @@ export default function AdminDashboard() {
         const { data: userData, error: userUpdateError } = await supabase
           .from("users")
           .update({ 
-            id_verified: true, // Sets both to true
-            face_verified: true
+            verified: true // Sets verified to true only for 'check' type
           })
           .eq("id", userId)
           .select();
@@ -240,13 +246,19 @@ export default function AdminDashboard() {
         req.id === requestId ? { ...req, status: "approved", processed_at: new Date().toISOString() } : req
       ));
 
-      // Update the user's verification status in the users state
-      setUsers(users.map(user => 
-        user.id === userId ? { ...user, id_verified: true, face_verified: true } : user
-      ));
+      // Update the user's verification status in the users state, but only for 'check' type
+      if (verificationType === "check") {
+        setUsers(users.map(user => 
+          user.id === userId ? { ...user, verified: true } : user
+        ));
+      }
       
       // Show success message
-      alert("Verification request approved successfully!");
+      if (verificationType === "check") {
+        alert("Verification request approved and user has been verified!");
+      } else {
+        alert("Verification request approved! A verification link must be sent to complete the process.");
+      }
     } catch (error) {
       console.error("Error approving verification:", error);
       alert(`Error approving verification: ${error.message || "Unknown error"}`);
@@ -285,100 +297,97 @@ export default function AdminDashboard() {
   }
 
   const submitVerificationLink = async () => {
-    if (!verificationLink.trim()) {
-      alert("Please enter a valid verification link");
+    if (!verificationLink || !currentUserId) {
+      alert("Error: Verification link and user ID are required");
       return;
     }
+  
     setIsSubmitting(true);
-    
+  
     try {
-      console.log("Submitting verification link:", {
-        requestId: currentRequestId,
-        userId: currentUserId,
-        link: verificationLink
-      });
-      
-      // First update the user record - ALSO update the verification status
-      const { data: userData, error: userUpdateError } = await supabase
+      // Debug logging
+      console.log("Attempting to update user:", currentUserId);
+      console.log("Verification link:", verificationLink);
+  
+      // Update only the verification_link, not the verified status
+      const userUpdateResponse = await supabase
         .from("users")
-        .update({ 
-          verification_link: verificationLink,
-          // Also mark the user as verified when sending a link
-          id_verified: true, // Sets both to true
-          face_verified: true
+        .update({
+          verification_link: verificationLink
+          // Removed: verified: true - User will be verified after completing the verification process
         })
         .eq("id", currentUserId)
-        .select();
+        .select(); // Add .select() to return the updated data
       
-      if (userUpdateError) {
-        // Handle potential missing column error gracefully
-        if (userUpdateError.message && userUpdateError.message.includes("column")) {
-          const confirmMigration = confirm("Database schema might be missing the verification_link column in 'users' table. Would you like to see instructions to add it?");
-          if (confirmMigration) {
-            alert("Please execute the add-verification-link-column.sql migration file or manually add a 'verification_link' text column to your 'users' table.");
-          }
-          // Continue even if user update fails, try updating the request
-        } else {
-          throw userUpdateError; // Rethrow other user update errors
-        }
-      } else {
-        console.log("Updated user data:", userData);
+      // Log the entire response for debugging
+      console.log("User update response:", userUpdateResponse);
+      
+      if (userUpdateResponse.error) {
+        console.error("Failed to update user record:", userUpdateResponse.error);
+        alert(`Error: Failed to update user: ${userUpdateResponse.error.message}`);
+        setIsSubmitting(false);
+        return;
       }
       
-      // Now update the verification request - Mark as approved and add the link
-      const { data: requestData, error: updateError } = await supabase
-        .from("verification_requests")
-        .update({ 
-          status: "approved", // Mark as approved when link is sent
-          processed_at: new Date().toISOString(),
-          verification_link: verificationLink
-        })
-        .eq("id", currentRequestId)
-        .select();
+      if (!userUpdateResponse.data || userUpdateResponse.data.length === 0) {
+        console.error("Update returned no data, user might not exist or you don't have permission");
+        alert("Error: Could not verify the update was successful");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      console.log("User record updated successfully:", userUpdateResponse.data[0]);
+      
+      // Update verification request as a separate operation (non-blocking)
+      try {
+        const requestUpdateResponse = await supabase
+          .from("verification_requests")
+          .update({
+            status: "approved",
+            processed_at: new Date().toISOString()
+            // Don't try to update verification_link in this table if it's causing issues
+          })
+          .eq("id", currentRequestId);
+          
+        console.log("Request update response:", requestUpdateResponse);
         
-      if (updateError) {
-        console.error("Error updating verification request:", updateError);
-        // Handle potential missing column error gracefully
-        if (updateError.message && updateError.message.includes("column")) {
-           alert("Warning: Could not save link in verification_requests table (schema might be outdated), but it should be saved in the user record if possible.");
-        } else {
-          throw updateError; // Rethrow other request update errors
+        if (requestUpdateResponse.error) {
+          console.warn("Could not update verification request, but continuing:", 
+            requestUpdateResponse.error);
         }
-      } else {
-        console.log("Updated verification request:", requestData);
+      } catch (requestError) {
+        console.warn("Error in request update (non-blocking):", requestError);
       }
-
-      // Update local state to reflect the change immediately in BOTH sections
-      setVerificationRequests(verificationRequests.map(req => 
-        req.id === currentRequestId ? { 
-          ...req, 
-          status: "approved", // Ensure status is approved
-          processed_at: new Date().toISOString(),
+      
+      // Update local state - only updating the verification_link, not the verified status
+      setUsers(users.map(user =>
+        user.id === currentUserId ? {
+          ...user,
           verification_link: verificationLink
+          // Removed: verified: true
+        } : user
+      ));
+      
+      setVerificationRequests(verificationRequests.map(req =>
+        req.id === currentRequestId ? {
+          ...req,
+          status: "approved",
+          processed_at: new Date().toISOString()
         } : req
       ));
       
-      // IMPORTANT: Also update the users array to reflect verified status
-      setUsers(users.map(user => 
-        user.id === currentUserId ? { 
-          ...user, 
-          id_verified: true,
-          face_verified: true,
-          verification_link: verificationLink
-        } : user
-      ));
-
-      // Close dialog and inform admin
+      // Updated success message to reflect that the user is not yet verified
+      alert("Success: Verification link has been sent to the user. The user will be verified after completing the verification process.");
       setIsDialogOpen(false);
-      alert(`Verification link has been saved and the request marked as approved. The link is now visible to the user.`);
+      setVerificationLink("");
       
     } catch (error) {
-      console.error("Error saving verification link:", error);
-      alert(`Error saving verification link: ${error.message || "Unknown error"}`);
+      console.error("Unexpected error in submitVerificationLink:", error);
+      alert(`Error: An unexpected error occurred: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   const filteredUsers = users.filter(user => 
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -480,10 +489,8 @@ export default function AdminDashboard() {
                         <TableCell className="font-medium">{user.name || "N/A"}</TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
-                          {user.id_verified && user.face_verified ? (
-                            <Badge variant="success" className="bg-green-100 text-green-800">Fully Verified</Badge>
-                          ) : user.id_verified || user.face_verified ? (
-                            <Badge variant="warning" className="bg-amber-100 text-amber-800">Partially Verified</Badge>
+                          {user.verified ? (
+                            <Badge variant="success" className="bg-green-100 text-green-800">Verified</Badge>
                           ) : (
                             <Badge variant="outline">Not Verified</Badge>
                           )}
