@@ -2,8 +2,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import CitySelector from "@/components/city-selector"
 import PostList from "@/components/post-list"
 import { getPosts } from "@/lib/database"
@@ -78,8 +77,8 @@ export default async function ForumPage({
             <TabsTrigger value="bangkok" asChild>
               <Link href={`/forums/${type}?city=bangkok`}>Bangkok</Link>
             </TabsTrigger>
-            <TabsTrigger value="london" asChild>
-              <Link href={`/forums/${type}?city=london`}>London</Link>
+            <TabsTrigger value="chennai" asChild>
+              <Link href={`/forums/${type}?city=chennai`}>chennai</Link>
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -91,24 +90,6 @@ export default async function ForumPage({
           </Button>
         </Link>
       </div>
-
-      {!isLoggedIn && (
-        <Alert className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Verification Required</AlertTitle>
-          <AlertDescription>
-            You must be verified to post or comment.{" "}
-            <Link href="/auth/signup" className="font-medium underline">
-              Sign up
-            </Link>{" "}
-            or{" "}
-            <Link href="/auth/login" className="font-medium underline">
-              login
-            </Link>{" "}
-            to participate.
-          </AlertDescription>
-        </Alert>
-      )}
 
       <PostList posts={posts} type={type} />
     </div>

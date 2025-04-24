@@ -287,7 +287,7 @@ export default function NewPostPage({ params }: { params: { type: string } }) {
                   <SelectItem value="tokyo">Tokyo</SelectItem>
                   <SelectItem value="paris">Paris</SelectItem>
                   <SelectItem value="bangkok">Bangkok</SelectItem>
-                  <SelectItem value="london">London</SelectItem>
+                  <SelectItem value="chennai">chennai</SelectItem>
                 </SelectContent>
               </Select>
             </div>

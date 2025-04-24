@@ -32,7 +32,7 @@ export default function Home() {
                 >
                   Get Started <ArrowRight className="h-4 w-4" />
                 </DiditAuthButton>
-                <Link href="/forums/suggestions">
+                <Link href="/dashboard">
                   <Button variant="outline" size="lg">
                     Explore Destinations
                   </Button>

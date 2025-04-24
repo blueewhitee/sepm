@@ -20,7 +20,7 @@ export const hardcodedCities: Record<string, string> = {
   tokyo: "Tokyo",
   paris: "Paris",
   bangkok: "Bangkok",
-  london: "London",
+  chennai: "Chennai",
 }
 
 // Cached version of getCities to prevent multiple API calls
